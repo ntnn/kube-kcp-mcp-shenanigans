@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	kindprovider "sigs.k8s.io/multicluster-runtime/providers/kind"
 )
 
 func main() {
@@ -32,7 +33,16 @@ var (
 func run(ctx context.Context) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "mcp-shenanigans", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, tools.PingTool, tools.Ping)
-	mcp.AddTool(server, tools.KubeconfigTool, tools.Kubeconfig)
+	// mcp.AddTool(server, tools.KubeconfigTool, tools.Kubeconfig)
+
+	mcrKindProvider := kindprovider.New(kindprovider.Options{})
+	mcrKindTool := tools.NewMCRTool(ctx, "kind", mcrKindProvider)
+
+	listClustersTool, listClustersHandler := mcrKindTool.ListClustersTool()
+	mcp.AddTool(server, listClustersTool, listClustersHandler)
+
+	getClusterTool, getClusterHandler := mcrKindTool.GetClusterTool()
+	mcp.AddTool(server, getClusterTool, getClusterHandler)
 
 	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return server
