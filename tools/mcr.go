@@ -23,14 +23,6 @@ func init() {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 }
 
-type MCRInput struct {
-	ClusterName string `json:"clusterName" jsonschema:"the name of the cluster to interact with"`
-}
-
-type MCROutput struct {
-	Config string `json:"config" jsonschema:"the config of the requested cluster"`
-}
-
 type MCRTool struct {
 	name     string
 	provider multicluster.Provider
@@ -90,7 +82,8 @@ type MCRGetClusterIn struct {
 }
 
 type MCRGetClusterOut struct {
-	Config string `json:"config" jsonschema:"the kubeconfig of the requested cluster"`
+	JSONConfig string `json:"jsonConfig" jsonschema:"the config of the requested cluster in JSON format"`
+	YAMLConfig string `json:"yamlConfig" jsonschema:"the config of the requested cluster in YAML format"`
 }
 
 func (tool *MCRTool) GetClusterTool() (*mcp.Tool, mcp.ToolHandlerFor[MCRGetClusterIn, MCRGetClusterOut]) {
@@ -110,12 +103,22 @@ func (tool *MCRTool) GetClusterTool() (*mcp.Tool, mcp.ToolHandlerFor[MCRGetClust
 
 		apiConfig := restToKubeconfig(cl.GetConfig())
 
-		marshalled, err := json.Marshal(apiConfig)
+		jsonMarshalled, err := json.Marshal(apiConfig)
 		if err != nil {
-			return nil, MCRGetClusterOut{}, fmt.Errorf("failed to marshal REST config for cluster %s: %w", input.ClusterName, err)
+			return nil, MCRGetClusterOut{}, fmt.Errorf("failed to json marshal REST config for cluster %s: %w", input.ClusterName, err)
 		}
 
-		return nil, MCRGetClusterOut{Config: string(marshalled)}, nil
+		yamlMarshalled, err := json.MarshalIndent(apiConfig, "", "  ")
+		if err != nil {
+			return nil, MCRGetClusterOut{}, fmt.Errorf("failed to yaml marshal REST config for cluster %s: %w", input.ClusterName, err)
+		}
+
+		out := MCRGetClusterOut{
+			JSONConfig: string(jsonMarshalled),
+			YAMLConfig: string(yamlMarshalled),
+		}
+
+		return nil, out, nil
 	}
 
 	return toolDef, handler
@@ -141,7 +144,11 @@ func restToKubeconfig(config *rest.Config) clientcmdapi.Config {
 		CurrentContext: "default",
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"default": {
-				Token: config.BearerToken,
+				Token:                 config.BearerToken,
+				Username:              config.Username,
+				Password:              config.Password,
+				ClientCertificateData: config.CertData,
+				ClientKeyData:         config.KeyData,
 			},
 		},
 	}
