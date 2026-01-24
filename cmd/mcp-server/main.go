@@ -33,6 +33,7 @@ func run(ctx context.Context) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "mcp-shenanigans", Version: "v1.0.0"}, nil)
 	mcp.AddTool(server, tools.PingTool, tools.Ping)
 	mcp.AddTool(server, tools.KubeconfigTool, tools.Kubeconfig)
+	mcp.AddTool(server, tools.ListWorkspacesTool, tools.ListWorkspaces)
 
 	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		return server
